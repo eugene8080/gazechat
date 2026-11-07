@@ -3,13 +3,19 @@
 //
 // Why: the tracked manifest must stay generic (upstream merges cleanly, no private hosts in a public repo),
 // but a personal build should (a) carry its own package_id so it never collides with the upstream store
-// listing, and (b) replace the catch-all "*" network allowlist with the exact Beeper origin(s) it needs.
+// listing, and (b) optionally replace the catch-all "*" network allowlist with exact origins.
+//
+// Trade-off of (b): the allowlist is part of the manifest, which Even Hub stores. Narrowing it confines the
+// app to your hosts but hands those addresses to Even; keeping "*" keeps them private (they are only typed
+// into the app's settings) but lets the app contact any host. Choose with "network".
 //
 // app.local.json (untracked, next to app.json):
 //   {
 //     "package_id": "com.example.gazechat",          // required: reverse-DNS id, unique to you
 //     "name": "GazeChat",                            // optional: display name override
-//     "beeper_origins": ["http://100.x.y.z:23373"]   // required: full origins only (scheme://host[:port])
+//     "version": "1.0.14",                           // optional: override app.json version (each upload needs a new one)
+//     "network": "any",                              // "any" = keep upstream "*" (default); "origins" = narrow
+//     "beeper_origins": ["http://100.x.y.z:23373"]   // required when network = "origins": full origins only
 //   }
 //
 // Usage: npm run pack:local   (runs `npm run build` first, then this script)
@@ -67,10 +73,15 @@ if (typeof local.package_id !== "string" || !/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){
 if (local.package_id === tracked.package_id) {
   fail("app.local.json package_id must differ from the upstream package_id, or your build collides with the store listing");
 }
-if (!Array.isArray(local.beeper_origins) || local.beeper_origins.length === 0) {
-  fail("app.local.json beeper_origins must be a non-empty array of origins");
+const networkMode = local.network ?? "any";
+if (networkMode !== "any" && networkMode !== "origins") fail(`app.local.json network must be "any" or "origins" (got ${JSON.stringify(networkMode)})`);
+let beeperOrigins = [];
+if (networkMode === "origins") {
+  if (!Array.isArray(local.beeper_origins) || local.beeper_origins.length === 0) {
+    fail('app.local.json beeper_origins must be a non-empty array of origins when network is "origins"');
+  }
+  beeperOrigins = local.beeper_origins.map(assertOrigin);
 }
-const beeperOrigins = local.beeper_origins.map(assertOrigin);
 
 const manifest = structuredClone(tracked);
 manifest.package_id = local.package_id;
@@ -80,19 +91,25 @@ if (local.name !== undefined) {
   }
   manifest.name = local.name;
 }
+if (local.version !== undefined) {
+  if (typeof local.version !== "string" || !/^\d+\.\d+\.\d+$/.test(local.version)) fail("app.local.json version must be x.y.z");
+  manifest.version = local.version;
+}
 
 const network = manifest.permissions?.find((p) => p.name === "network");
 if (!network || !Array.isArray(network.whitelist)) fail("tracked app.json has no network whitelist to narrow");
 
-// Keep upstream's static help-link entries, drop the catch-all and the localhost default
-// (localhost on the phone is the phone itself, never Beeper Desktop), then add our origins.
-const kept = network.whitelist.filter((entry) => entry !== "*" && !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(entry));
-network.whitelist = [...new Set([...beeperOrigins, ...kept])];
+if (networkMode === "origins") {
+  // Keep upstream's static help-link entries, drop the catch-all and the localhost default
+  // (localhost on the phone is the phone itself, never Beeper Desktop), then add our origins.
+  const kept = network.whitelist.filter((entry) => entry !== "*" && !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(entry));
+  network.whitelist = [...new Set([...beeperOrigins, ...kept])];
+}
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(outManifest, JSON.stringify(manifest, null, 2) + "\n");
 console.log(`[pack-local] manifest: ${outManifest}`);
-console.log(`[pack-local] package_id=${manifest.package_id} whitelist=${JSON.stringify(network.whitelist)}`);
+console.log(`[pack-local] package_id=${manifest.package_id} version=${manifest.version} network=${networkMode} whitelist=${JSON.stringify(network.whitelist)}`);
 
 if (!existsSync(resolve(root, "dist", "index.html"))) fail("dist/index.html missing: run `npm run build` first");
 

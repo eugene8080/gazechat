@@ -15,8 +15,9 @@ fork of [thibautrey/even-messages](https://github.com/thibautrey/even-messages).
 
 `npm run pack:local` builds `gazechat-local.ehpk` from `app.json` plus the untracked `app.local.json`
 (copy `app.local.example.json`). It sets our own `package_id`, so the build never collides with the
-upstream store listing, and replaces the catch-all `"*"` network allowlist with the exact Beeper Desktop
-origin(s). The private origin never enters git.
+upstream store listing, and can replace the catch-all `"*"` network allowlist with the exact Beeper Desktop
+origin(s) only if `"network": "origins"` (default `"any"` keeps upstream `"*"`, so no address goes into the
+manifest Even Hub stores). Each upload needs a new `"version"`. The private origin never enters git.
 
 ## Review notes (2026-11-07)
 
