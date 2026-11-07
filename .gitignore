@@ -48,3 +48,8 @@ evenmessages.ehpk
 AGENTS.md
 CLAUDE.md
 messages.ehpk
+
+# Personal build (tools/pack-local.mjs): private origins and package id stay out of git
+app.local.json
+.local-build/
+gazechat-local.ehpk

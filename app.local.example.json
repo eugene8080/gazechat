@@ -1,0 +1,5 @@
+{
+  "package_id": "com.example.gazechat",
+  "name": "GazeChat",
+  "beeper_origins": ["http://192.0.2.10:23373"]
+}

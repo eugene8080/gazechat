@@ -11,7 +11,8 @@
     "test": "node --test",
     "type-check": "tsc --noEmit",
     "qr": "evenhub qr --http --port 5173",
-    "pack": "npm run build && evenhub pack app.json dist -o messages.ehpk"
+    "pack": "npm run build && evenhub pack app.json dist -o messages.ehpk",
+    "pack:local": "npm run build && node tools/pack-local.mjs"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "0.0.16",
